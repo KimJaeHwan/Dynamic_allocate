@@ -8,6 +8,7 @@ extern void debug(const char *fmt, ...);
 extern void *sbrk(intptr_t increment);
 
 unsigned int max_size = 0;
+void * heap_start = 0;
 
 void allocated_bit_set(void *p){
     int8_t * ptr = (int8_t*)p;
@@ -24,9 +25,8 @@ void allocated_bit_set(void *p){
 
 void *myalloc(size_t size)
 {
-    void * heap_start = 0;
-    void * end = sbrk(0);
-    heap_start = end - max_size;     // find first heap block
+    void * end_block = sbrk(0);
+    heap_start = end_block - max_size;     // find first heap block
 
     int32_t * p;
     p = heap_start;
@@ -36,19 +36,19 @@ void *myalloc(size_t size)
     
     printf("myalloc : %d, newsize : %d, %p\n",size,newsize,p);
     // search free block
-    while((p < end) && ((*p & 1) || (*p <= newsize))){
+    while((p < end_block) && ((*p & 1) || (*p <= newsize))){
         printf("find free block p : %p, %d\n(*p & -2): %x : result : %p\n", p, *(int32_t*)p,(*p & -2),(void*)p + (*p & -2));
         p = (void*)p + (*p & -2);
         printf("find free block %p\n",p);
     }
-    printf("find block p : %p end : %p\n",p,end);
-    if(p == end){       // free된 영역들 중에 맞는 블록이 없는경우 
+    printf("find block p : %p end_block_block : %p\n",p,end_block);
+    if(p == end_block){       // free된 영역들 중에 맞는 블록이 없는경우 
         printf("create new block\n");
         p = (int32_t*)sbrk(newsize);                // 새로운 메모리 블록 생성
 
         *p = newsize;                               // new header 
         *(int32_t*)((void*)p + newsize - 4) = newsize;  // new tag
-        *(int32_t*)((void*)p + newsize) = 1;            // end block check
+        *(int32_t*)((void*)p + newsize) = 1;            // end_block block check
 
         printf("create new block size %d, newsize %d\n",size,newsize);
         printf("*p : %p %d sbrk(0): %p\n",p,*p,(int32_t*)sbrk(0));
@@ -56,7 +56,7 @@ void *myalloc(size_t size)
 
         printf("create new block\n");
 
-        //end = (int32_t*)sbrk(0) - newsize;
+        //end_block = (int32_t*)sbrk(0) - newsize;
         max_size += newsize;
         // debug print
 
@@ -88,9 +88,10 @@ void *myalloc(size_t size)
         memcpy(ptr + *p - 4 , p, sizeof(int32_t));  //set new tag
 
         *(ptr + *p) = remain_memory;    //set new header remain memory
-        memcpy(ptr + oldsize - 4, ptr + *p, sizeof(int32_t));    //set new tag remain memory
+        *(ptr + oldsize -4 ) = remain_memory;    //set new tag remain memory
+        //memcpy(ptr + oldsize - 4, ptr + *p, sizeof(int32_t));    //set new tag remain memory
+        //allocated_bit_set((void*)(ptr + *p));                   // ? allocated bit 왜해놓냐
         allocated_bit_set((void*)p);
-        allocated_bit_set((void*)(ptr + *p));
 
         // debugprint 
         debug("alloc(%u): %p\n", (unsigned int)newsize, p);
@@ -130,6 +131,12 @@ void myfree(void *ptr)
     int32_t * p;
     int32_t * next;
     int32_t * pre;
+
+    if(ptr == 0){    // free(0) 인경우 <- 이건 뭐지....
+        return;
+    }
+
+
     p = (int32_t*)(ptr - HEADER_LEN);       // p = header pointer
     *p &= -2;                               // allocate flag clear
     next = (int32_t*)((void *)p + *p);      // next  block header pointer
@@ -144,17 +151,27 @@ void myfree(void *ptr)
         *p += *next;
         *(int32_t*)((void*)p + *p - 4) = *p;// p block tag 업데이트
     }
-    if((*pre &1) == 0){                     // 이전 블록이 free 된 블록인경우
+    if( (p != heap_start) && (*pre &1) == 0 ){                     // 이전 블록이 free 된 블록인경우 이면서 현재 블록이 맨앞이 아닌경우
         *pre += *p;
         *(int32_t*)((void*)pre + *pre - 4) = *pre;  // pre block tag 업데이트 
     }
-    // 마지막 블록을 free 하는경우 max_size를 줄어주어야한다. 
-    if(*next == 1 && (*pre & 1)){                 // 마지막 블록이 and previous block is allocated
-        // next 블록이 free된경우 같이 반환,
-
+     
+    if(*next == 1 ){                 // 현재블록이 마지막 블록
+        if((p != heap_start) && (*pre & 1) == 0 ){      // 현재 블록이 맨앞이 아니며 이전 블록이 할당 되어있지 않은경우
+            max_size -= *pre;
+            sbrk(-(*pre));
+            *pre = 1;
+        }else{                                          // 현재 블록이 맨앞이거나 , 이전 블록이 할당되어있는경우 
+            max_size -= *p;
+            sbrk(-(*p));
+            if(p != heap_start){                        // 현재 블록이 맨앞이 아닌경우
+                *p = 1;
+            }
+            
+        }
         // next 블록이 free가 아니라면 나만 반환
-    }else{					// free last block and previous block is unallocated
-    
     }
+    printf("memeory heap_start : %p\n",heap_start);
+    printf("free end_block : %p\n",sbrk(0));
     debug("free(%p)\n", ptr);
 }
