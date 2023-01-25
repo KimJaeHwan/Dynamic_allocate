@@ -36,9 +36,9 @@ void *myalloc(size_t size)
     
     printf("myalloc : %d, newsize : %d, %p\n",size,newsize,p);
     // search free block
-    while((p < end_block) && ((*p & 1) || (*p <= newsize))){
+    while((p < end_block) && ((*(int32_t*)p & 1) || (*(int32_t*)p <= newsize))){
         printf("find free block p : %p, %d\n(*p & -2): %x : result : %p\n", p, *(int32_t*)p,(*p & -2),(void*)p + (*p & -2));
-        p = (void*)p + (*p & -2);
+        p = (void*)p + (*(int32_t*)p & -2);
         printf("find free block %p\n",p);
     }
     printf("find block p : %p end_block_block : %p\n",p,end_block);
@@ -60,7 +60,7 @@ void *myalloc(size_t size)
         max_size += newsize;
         // debug print
 
-        debug("alloc(%u): %p\n", (unsigned int)newsize, p);
+        debug("alloc(%u)%u: %p %x %x\n", (unsigned int)size,(unsigned int)newsize, p, *p , *(int32_t*)((void*)p + *p -4));
         debug("max: %u\n", max_size);
         printf("return point : %p\n", (void*)(p + 1));
         return (void*)(p + 1);
@@ -76,11 +76,12 @@ void *myalloc(size_t size)
         */
 
         // debug print
-        debug("alloc(%u): %p\n", (unsigned int)newsize, p);
+        debug("alloc(%u)%u: %p %x %x\n", (unsigned int)size,(unsigned int)newsize, p, *p , *(int32_t*)((void*)p + *p -4));
         debug("max: %u\n", max_size);
         return (void*)(p + 1);
 
     }else{              // 사이즈가 작은경우
+        printf("debugging p *p : %p , %d\n",p,*p);
         int remain_memory = *p - newsize;
         ptr = (int8_t *)p;
         int oldsize = *p;
@@ -94,7 +95,7 @@ void *myalloc(size_t size)
         allocated_bit_set((void*)p);
 
         // debugprint 
-        debug("alloc(%u): %p\n", (unsigned int)newsize, p);
+        debug("alloc(%u)%u: %p %x %x\n", (unsigned int)size,(unsigned int)newsize, p, *p , *(int32_t*)((void*)p + *p -4));
         debug("max: %u\n", max_size);
         return (void*)(p + 1);
     }
@@ -102,7 +103,6 @@ void *myalloc(size_t size)
     //void *p = sbrk(size);
 
     // make header & tag
-
 
     // debuging print
     debug("alloc(%u): %p\n", (unsigned int)size, p);
@@ -116,10 +116,13 @@ void *myrealloc(void *ptr, size_t size)
     void *p = NULL;
     if (size != 0)
     {
-        p = sbrk(size);
+        p = myalloc(size);
+        
         if (ptr)
-            memcpy(p, ptr, size);
-        max_size += size;
+            memcpy(p, ptr, (*(int32_t*)(ptr - 4)) & -2);
+        
+        //max_size += size;
+        myfree(ptr);
         debug("max: %u\n", max_size);
     }
     debug("realloc(%p, %u): %p\n", ptr, (unsigned int)size, p);
