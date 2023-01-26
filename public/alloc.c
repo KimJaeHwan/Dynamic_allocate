@@ -12,13 +12,15 @@ void * heap_start = 0;
 
 void allocated_bit_set(void *p){
     int8_t * ptr = (int8_t*)p;
-    printf("allocated bit : %p\n",p);
+    debug("allocated bit : %p\n",p);
     
     *(int32_t*)(ptr + *(int32_t*)p - 4) |=1;  // allocated bit set tag
 
-    printf("allocated tag flag : %p %d\n",(int32_t*)(ptr + *(int32_t*)p - 4),*(int32_t*)(ptr + *(int32_t*)p - 4));
+    debug("allocated tag flag : %p %d\n",(int32_t*)(ptr + *(int32_t*)p - 4),*(int32_t*)(ptr + *(int32_t*)p - 4));
+    debug("allocated p : %p %x\n",p + *(int32_t*)p ,*(int32_t*)(p + *(int32_t*)p));
     *(int32_t*)p |= 1;        // allocated bit set header
-    printf("allocated flag : %d\n",*(int32_t*)p);
+    debug("allocated p : %p %x\n",p + *(int32_t*)p ,*(int32_t*)(p + *(int32_t*)p));
+    debug("allocated flag : %d\n",*(int32_t*)p);
     //*( p + HEADER_LEN + newsize) |= 1;    // allocate bit set tag
     //return (void*)( p + 1 )             // return memory block data pointer   
 }
@@ -60,7 +62,7 @@ void *myalloc(size_t size)
         max_size += newsize;
         // debug print
 
-        debug("alloc(%u)%u: %p %x %x\n", (unsigned int)size,(unsigned int)newsize, p, *p , *(int32_t*)((void*)p + *p -4));
+        debug("alloc(%u)%u: %p %x %p %x\n", (unsigned int)size,(unsigned int)newsize, p, *p , (int32_t*)((void*)p + (*p & -2) -4),*(int32_t*)((void*)p + (*p & -2) -4));
         debug("max: %u\n", max_size);
         printf("return point : %p\n", (void*)(p + 1));
         return (void*)(p + 1);
@@ -76,7 +78,7 @@ void *myalloc(size_t size)
         */
 
         // debug print
-        debug("alloc(%u)%u: %p %x %x\n", (unsigned int)size,(unsigned int)newsize, p, *p , *(int32_t*)((void*)p + *p -4));
+        debug("alloc(%u)%u: %p %x %p %x\n", (unsigned int)size,(unsigned int)newsize, p, *p , (int32_t*)((void*)p + (*p & -2) -4),*(int32_t*)((void*)p + (*p & -2) -4));
         debug("max: %u\n", max_size);
         return (void*)(p + 1);
 
@@ -86,16 +88,20 @@ void *myalloc(size_t size)
         ptr = (int8_t *)p;
         int oldsize = *p;
         *p = newsize;       //set new header
-        memcpy(ptr + *p - 4 , p, sizeof(int32_t));  //set new tag
-
-        *(ptr + *p) = remain_memory;    //set new header remain memory
-        *(ptr + oldsize -4 ) = remain_memory;    //set new tag remain memory
+        //memcpy(ptr + *p - 4 , p, sizeof(int32_t));  //set new tag
+        *(int32_t*)((void*)p + *p -4) = newsize;
+        *(int32_t*)((void*)p + *p) = remain_memory;    //set new header remain memory
+        *(int32_t*)((void*)p + oldsize -4 ) = remain_memory;    //set new tag remain memory
         //memcpy(ptr + oldsize - 4, ptr + *p, sizeof(int32_t));    //set new tag remain memory
         //allocated_bit_set((void*)(ptr + *p));                   // ? allocated bit 왜해놓냐
+        debug("remained memoryinfo : %p %x %p %x\n",(void*)p + *p, *(int32_t*)((void*)p + *p),((void*)p + oldsize -4 ),*(int32_t*)((void*)p + oldsize -4 ));
+        debug("old size :%d\n",oldsize);
         allocated_bit_set((void*)p);
-
+        debug("old size :%d\n",oldsize);
+        debug("remained memoryinfo : %p %x %p %x\n",(void*)p + (*p & -2) , *(int32_t*)((void*)p + (*p & -2)),((void*)p + oldsize -4 ),*(int32_t*)((void*)p + oldsize -4 ));
+        
         // debugprint 
-        debug("alloc(%u)%u: %p %x %x\n", (unsigned int)size,(unsigned int)newsize, p, *p , *(int32_t*)((void*)p + *p -4));
+        debug("alloc(%u)%u: %p %x %p %x\n", (unsigned int)size,(unsigned int)newsize, p, *p , (int32_t*)((void*)p + (*p & -2) -4),*(int32_t*)((void*)p + (*p & -2) -4));
         debug("max: %u\n", max_size);
         return (void*)(p + 1);
     }
@@ -118,11 +124,13 @@ void *myrealloc(void *ptr, size_t size)
     {
         p = myalloc(size);
         
-        if (ptr)
-            memcpy(p, ptr, (*(int32_t*)(ptr - 4)) & -2);
-        
+        if (ptr){
+            debug("realloc %p %p %x\n",p,ptr,(*(int32_t*)(ptr - 4)) & -2);
+            //memcpy(p, ptr, (*(int32_t*)(ptr - 4)) & -2);
+            memcpy(p, ptr, size);
+            myfree(ptr);
+        }
         //max_size += size;
-        myfree(ptr);
         debug("max: %u\n", max_size);
     }
     debug("realloc(%p, %u): %p\n", ptr, (unsigned int)size, p);
@@ -142,6 +150,7 @@ void myfree(void *ptr)
 
     p = (int32_t*)(ptr - HEADER_LEN);       // p = header pointer
     *p &= -2;                               // allocate flag clear
+    *(int32_t*)((void*)p + *p -4) &= -2;    // allocate flag clear tag
     next = (int32_t*)((void *)p + *p);      // next  block header pointer
     pre = (int32_t*)((void*)p - 4);
     pre = (int32_t*)((void*)p - (*pre & -2));    // pre block header ponter
