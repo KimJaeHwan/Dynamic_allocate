@@ -27,6 +27,8 @@ void allocated_bit_set(void *p){
 
 void *myalloc(size_t size)
 {
+    static first_init = 1;                  // 첫번째 수행인가?
+
     void * end_block = sbrk(0);
     heap_start = end_block - max_size;     // find first heap block
 
@@ -45,14 +47,15 @@ void *myalloc(size_t size)
     }
     printf("find block p : %p end_block_block : %p\n",p,end_block);
     if(p == end_block){       // free된 영역들 중에 맞는 블록이 없는경우 
+        
         printf("create new block\n");
         p = (int32_t*)sbrk(newsize);                // 새로운 메모리 블록 생성
 
         *p = newsize;                               // new header 
         *(int32_t*)((void*)p + newsize - 4) = newsize;  // new tag
-        *(int32_t*)((void*)p + newsize) = 1;            // end_block block check
+        //*(int32_t*)((void*)p + newsize) = 1;            // end_block block check
 
-        printf("create new block size %d, newsize %d\n",size,newsize);
+        printf("create new block size %d, newsize %d\n",size, newsize);
         printf("*p : %p %d sbrk(0): %p\n",p,*p,(int32_t*)sbrk(0));
         allocated_bit_set((void*)p);
 
@@ -95,9 +98,9 @@ void *myalloc(size_t size)
         //memcpy(ptr + oldsize - 4, ptr + *p, sizeof(int32_t));    //set new tag remain memory
         //allocated_bit_set((void*)(ptr + *p));                   // ? allocated bit 왜해놓냐
         debug("remained memoryinfo : %p %x %p %x\n",(void*)p + *p, *(int32_t*)((void*)p + *p),((void*)p + oldsize -4 ),*(int32_t*)((void*)p + oldsize -4 ));
-        debug("old size :%d\n",oldsize);
+        //debug("old size :%d\n",oldsize);
         allocated_bit_set((void*)p);
-        debug("old size :%d\n",oldsize);
+        //debug("old size :%d\n",oldsize);
         debug("remained memoryinfo : %p %x %p %x\n",(void*)p + (*p & -2) , *(int32_t*)((void*)p + (*p & -2)),((void*)p + oldsize -4 ),*(int32_t*)((void*)p + oldsize -4 ));
         
         // debugprint 
