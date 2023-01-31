@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include "printf.h"
 #define HEADER_LEN 4
 
 extern void debug(const char *fmt, ...);
@@ -9,18 +9,18 @@ extern void *sbrk(intptr_t increment);
 
 unsigned int max_size = 0;
 void * heap_start = 0;
-
+void * end_block = 0;
 void allocated_bit_set(void *p){
     int8_t * ptr = (int8_t*)p;
     debug("allocated bit : %p\n",p);
     
     *(int32_t*)(ptr + *(int32_t*)p - 4) |=1;  // allocated bit set tag
 
-    debug("allocated tag flag : %p %d\n",(int32_t*)(ptr + *(int32_t*)p - 4),*(int32_t*)(ptr + *(int32_t*)p - 4));
-    debug("allocated p : %p %x\n",p + *(int32_t*)p ,*(int32_t*)(p + *(int32_t*)p));
+    //debug("allocated tag flag : %p %d\n",(int32_t*)(ptr + *(int32_t*)p - 4),*(int32_t*)(ptr + *(int32_t*)p - 4));
+    //debug("allocated p : %p %x\n",p + *(int32_t*)p ,*(int32_t*)(p + *(int32_t*)p));
     *(int32_t*)p |= 1;        // allocated bit set header
-    debug("allocated p : %p %x\n",p + *(int32_t*)p ,*(int32_t*)(p + *(int32_t*)p));
-    debug("allocated flag : %d\n",*(int32_t*)p);
+    //debug("allocated p : %p %x\n",p + *(int32_t*)p ,*(int32_t*)(p + *(int32_t*)p));
+    //debug("allocated flag : %d\n",*(int32_t*)p);
     //*( p + HEADER_LEN + newsize) |= 1;    // allocate bit set tag
     //return (void*)( p + 1 )             // return memory block data pointer   
 }
@@ -28,8 +28,7 @@ void allocated_bit_set(void *p){
 void *myalloc(size_t size)
 {
     static first_init = 1;                  // 첫번째 수행인가?
-
-    void * end_block = sbrk(0);
+    end_block = sbrk(0);
     heap_start = end_block - max_size;     // find first heap block
 
     int32_t * p;
@@ -38,28 +37,26 @@ void *myalloc(size_t size)
     
     int newsize = ((size + 15 + HEADER_LEN*2) >> 4 ) << 4;   // 16의 배수 라운딩 , header & tag 자리 생성
     
-    printf("myalloc : %d, newsize : %d, %p\n",size,newsize,p);
+    //printf("myalloc : %d, newsize : %d, %p\n",size,newsize,p);
     // search free block
     while((p < end_block) && ((*(int32_t*)p & 1) || (*(int32_t*)p <= newsize))){
-        printf("find free block p : %p, %d\n(*p & -2): %x : result : %p\n", p, *(int32_t*)p,(*p & -2),(void*)p + (*p & -2));
+        //printf("find free block p : %p, %d\n(*p & -2): %x : result : %p\n", p, *(int32_t*)p,(*p & -2),(void*)p + (*p & -2));
         p = (void*)p + (*(int32_t*)p & -2);
-        printf("find free block %p\n",p);
+        //printf("find free block %p\n",p);
     }
-    printf("find block p : %p end_block_block : %p\n",p,end_block);
-    if(p == end_block){       // free된 영역들 중에 맞는 블록이 없는경우 
-        
+    //printf("find block p : %p end_block_block : %p\n",p,end_block);
+    if(p == end_block){       // free된 영역들 중에 맞는 블록이 없는경우    
         printf("create new block\n");
         p = (int32_t*)sbrk(newsize);                // 새로운 메모리 블록 생성
-
         *p = newsize;                               // new header 
         *(int32_t*)((void*)p + newsize - 4) = newsize;  // new tag
         //*(int32_t*)((void*)p + newsize) = 1;            // end_block block check
 
-        printf("create new block size %d, newsize %d\n",size, newsize);
-        printf("*p : %p %d sbrk(0): %p\n",p,*p,(int32_t*)sbrk(0));
+        //printf("create new block size %d, newsize %d\n",size, newsize);
+        //printf("*p : %p %d sbrk(0): %p\n",p,*p,(int32_t*)sbrk(0));
         allocated_bit_set((void*)p);
 
-        printf("create new block\n");
+        //printf("create new block\n");
 
         //end_block = (int32_t*)sbrk(0) - newsize;
         max_size += newsize;
@@ -67,7 +64,7 @@ void *myalloc(size_t size)
 
         debug("alloc(%u)%u: %p %x %p %x\n", (unsigned int)size,(unsigned int)newsize, p, *p , (int32_t*)((void*)p + (*p & -2) -4),*(int32_t*)((void*)p + (*p & -2) -4));
         debug("max: %u\n", max_size);
-        printf("return point : %p\n", (void*)(p + 1));
+        //printf("return point : %p\n", (void*)(p + 1));
         return (void*)(p + 1);
     }
     if(*p == newsize){     // 딱 맞는 사이즈인 경우 
@@ -86,7 +83,7 @@ void *myalloc(size_t size)
         return (void*)(p + 1);
 
     }else{              // 사이즈가 작은경우
-        printf("debugging p *p : %p , %d\n",p,*p);
+        //printf("debugging p *p : %p , %d\n",p,*p);
         int remain_memory = *p - newsize;
         ptr = (int8_t *)p;
         int oldsize = *p;
@@ -97,11 +94,11 @@ void *myalloc(size_t size)
         *(int32_t*)((void*)p + oldsize -4 ) = remain_memory;    //set new tag remain memory
         //memcpy(ptr + oldsize - 4, ptr + *p, sizeof(int32_t));    //set new tag remain memory
         //allocated_bit_set((void*)(ptr + *p));                   // ? allocated bit 왜해놓냐
-        debug("remained memoryinfo : %p %x %p %x\n",(void*)p + *p, *(int32_t*)((void*)p + *p),((void*)p + oldsize -4 ),*(int32_t*)((void*)p + oldsize -4 ));
+        //debug("remained memoryinfo : %p %x %p %x\n",(void*)p + *p, *(int32_t*)((void*)p + *p),((void*)p + oldsize -4 ),*(int32_t*)((void*)p + oldsize -4 ));
         //debug("old size :%d\n",oldsize);
         allocated_bit_set((void*)p);
         //debug("old size :%d\n",oldsize);
-        debug("remained memoryinfo : %p %x %p %x\n",(void*)p + (*p & -2) , *(int32_t*)((void*)p + (*p & -2)),((void*)p + oldsize -4 ),*(int32_t*)((void*)p + oldsize -4 ));
+        //debug("remained memoryinfo : %p %x %p %x\n",(void*)p + (*p & -2) , *(int32_t*)((void*)p + (*p & -2)),((void*)p + oldsize -4 ),*(int32_t*)((void*)p + oldsize -4 ));
         
         // debugprint 
         debug("alloc(%u)%u: %p %x %p %x\n", (unsigned int)size,(unsigned int)newsize, p, *p , (int32_t*)((void*)p + (*p & -2) -4),*(int32_t*)((void*)p + (*p & -2) -4));
@@ -145,32 +142,63 @@ void myfree(void *ptr)
     int32_t * p;
     int32_t * next;
     int32_t * pre;
+    int32_t * free_ponter;
+    printf("end_block : %p\n",end_block);
 
     if(ptr == 0){    // free(0) 인경우 <- 이건 뭐지....
         return;
     }
 
+    
 
     p = (int32_t*)(ptr - HEADER_LEN);       // p = header pointer
     *p &= -2;                               // allocate flag clear
     *(int32_t*)((void*)p + *p -4) &= -2;    // allocate flag clear tag
     next = (int32_t*)((void *)p + *p);      // next  block header pointer
-    pre = (int32_t*)((void*)p - 4);
-    pre = (int32_t*)((void*)p - (*pre & -2));    // pre block header ponter
+    
+    //pre = (int32_t*)((void*)p - 4);
+    //pre = (int32_t*)((void*)p - (*pre & -2));    // pre block header ponter
 
-    printf("free block pre, p, next : %p, %p, %p\n",pre, p, next);
-    printf("free block data : %8d, %8d, %8d\n", *pre, *p, *next);
+    //printf("free block pre, p, next : %p, %p, %p\n",pre, p, next);
+    //printf("free block data : %8d, %8d, %8d\n", *pre, *p, *next);
+    printf("free p : %p %x\n",p,*p);
+    
+    if( p == heap_start){                   // 현재 블록이 맨 앞인경우
+        //max_size -= *p;
+        //sbrk(-(*p));
+        free_ponter = p;
+        printf("free first block : %p %x\n",p,*p);
+    }else{
+        pre = (int32_t*)((void*)p - 4);
+        pre = (int32_t*)((void*)p - (*pre & -2));    // pre block header ponter
+
+        if((*pre &1) == 0){                         // 이전 블록이 free된 경우
+            *pre += *p;
+            *(int32_t*)((void*)pre + *pre - 4) = *pre;  // pre block tag 업데이트 
+            free_ponter = pre;
+        }else{
+            free_ponter = p;
+        }
+        
+    }
+
+    if(p == end_block){
+        printf("free end_block %p %x\n",free_ponter,*free_ponter);
+        max_size -= *free_ponter;
+        free_ponter = sbrk(-(*free_ponter));    // 메모리 반환 안댐 -한다고 안댐 ㅋ;;
+        printf("free end_block new endblock : %p\n",free_ponter);
+        //*free_ponter = 1;
+    }else{
+        if((*next &1) == 0){                    // 다음블록이 free된 블록인경우
+            *free_ponter += *next;
+             *(int32_t*)((void*)free_ponter + *free_ponter - 4) = *free_ponter;// p block tag 업데이트
+            printf("nextblockfree : nextblock : %p %x\n",next, *next);
+        }
+    }
 
     
-    if((*next &1) == 0){                    // 다음블록이 free된 블록인경우
-        *p += *next;
-        *(int32_t*)((void*)p + *p - 4) = *p;// p block tag 업데이트
-    }
-    if( (p != heap_start) && (*pre &1) == 0 ){                     // 이전 블록이 free 된 블록인경우 이면서 현재 블록이 맨앞이 아닌경우
-        *pre += *p;
-        *(int32_t*)((void*)pre + *pre - 4) = *pre;  // pre block tag 업데이트 
-    }
-     
+   
+    /*
     if(*next == 1 ){                 // 현재블록이 마지막 블록
         if((p != heap_start) && (*pre & 1) == 0 ){      // 현재 블록이 맨앞이 아니며 이전 블록이 할당 되어있지 않은경우
             max_size -= *pre;
@@ -186,7 +214,8 @@ void myfree(void *ptr)
         }
         // next 블록이 free가 아니라면 나만 반환
     }
-    printf("memeory heap_start : %p\n",heap_start);
-    printf("free end_block : %p\n",sbrk(0));
+    */
+    //printf("memeory heap_start : %p\n",heap_start);
+    //printf("free end_block : %p\n",sbrk(0));
     debug("free(%p)\n", ptr);
 }
