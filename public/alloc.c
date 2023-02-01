@@ -143,14 +143,11 @@ void myfree(void *ptr)
     int32_t * next;
     int32_t * pre;
     int32_t * free_ponter;
-    printf("end_block : %p\n",end_block);
+    printf("end_block : %p sbbrk(0) : %p\n",end_block,sbrk(0));
 
     if(ptr == 0){    // free(0) 인경우 <- 이건 뭐지....
         return;
     }
-
-    
-
     p = (int32_t*)(ptr - HEADER_LEN);       // p = header pointer
     *p &= -2;                               // allocate flag clear
     *(int32_t*)((void*)p + *p -4) &= -2;    // allocate flag clear tag
@@ -182,10 +179,10 @@ void myfree(void *ptr)
         
     }
 
-    if(p == end_block){
+    if(next == sbrk(0)){
         printf("free end_block %p %x\n",free_ponter,*free_ponter);
         max_size -= *free_ponter;
-        free_ponter = sbrk(-(*free_ponter));    // 메모리 반환 안댐 -한다고 안댐 ㅋ;;
+        free_ponter = sbrk(-(*free_ponter));    
         printf("free end_block new endblock : %p\n",free_ponter);
         //*free_ponter = 1;
     }else{
@@ -195,26 +192,6 @@ void myfree(void *ptr)
             printf("nextblockfree : nextblock : %p %x\n",next, *next);
         }
     }
-
-    
-   
-    /*
-    if(*next == 1 ){                 // 현재블록이 마지막 블록
-        if((p != heap_start) && (*pre & 1) == 0 ){      // 현재 블록이 맨앞이 아니며 이전 블록이 할당 되어있지 않은경우
-            max_size -= *pre;
-            sbrk(-(*pre));
-            *pre = 1;
-        }else{                                          // 현재 블록이 맨앞이거나 , 이전 블록이 할당되어있는경우 
-            max_size -= *p;
-            sbrk(-(*p));
-            if(p != heap_start){                        // 현재 블록이 맨앞이 아닌경우
-                *p = 1;
-            }
-            
-        }
-        // next 블록이 free가 아니라면 나만 반환
-    }
-    */
     //printf("memeory heap_start : %p\n",heap_start);
     //printf("free end_block : %p\n",sbrk(0));
     debug("free(%p)\n", ptr);
